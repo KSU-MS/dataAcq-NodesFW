@@ -7,7 +7,9 @@
 #include <math.h>
 #include <SimpleKalmanFilter.h>
 #define RPM_TIMEOUT 100
-Metro canSend = Metro(500);
+#define BOARD_ID 0x4CF
+#define SEND_DELAY 500
+Metro canSend = Metro(SEND_DELAY); //set freq here
 // Can chip defines
 #define CAN_CS 10
 #define CAN_IRQ 14 //interrupt not used here, nor on board
@@ -125,8 +127,10 @@ void setup()
 }
 void loop()
 {
-  adc0 = ads.readADC_SingleEnded(0); //grab raw adc reading as 16 bit uint
-  
+  digitalWrite(LED_BUILTIN,LOW);
+  //adc0 = ads.readADC_SingleEnded(0); //grab raw adc reading as 16 bit uint
+  adc0 = analogRead(A0); //trying to get an ads1113 reading will lock up teensy if it fails
+  uint16_t estimated_adc0 = simpleKalmanFilter.updateEstimate(adc0);
   unsigned long test = millis();
   if((test - current_rpm_change_time) > RPM_TIMEOUT) {
     // rpm.data = 0;
@@ -181,10 +185,12 @@ void loop()
   uint8_t tiretemp3avg=tiretemp3/42;
 
   // // This is how you create a packet                         //0           1             2             3   4    5    6   7
-  CanPacket packet = {timestamp : millis(), id : 10000, data : {tiretemp1avg,tiretemp2avg, tiretemp3avg, 0x4, 0x5, 0x6, 0x7, 0x8}, delim : CAN_PACKET_DELIM};
-  memcpy(&packet.data[3], &current_rpm, sizeof(current_rpm)); //byte 3,4 for wheel speed
-  memcpy(&packet.data[5], &adc0, sizeof(adc0)); //byte 6,7 for shock pot
+
   if(canSend.check()){
+    digitalWrite(LED_BUILTIN,HIGH);
+    CanPacket packet = {timestamp : 0, id : BOARD_ID, data : {tiretemp1avg,tiretemp2avg, tiretemp3avg, 0x4, 0x5, 0x6, 0x7, 0x8}, delim : 0};
+    memcpy(&packet.data[3], &current_rpm, sizeof(current_rpm)); //byte 3,4 for wheel speed
+    memcpy(&packet.data[5], &adc0, sizeof(estimated_adc0)); //byte 6,7 for shock pot
     can.send(&packet);
   }
 }
