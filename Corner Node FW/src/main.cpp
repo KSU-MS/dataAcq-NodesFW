@@ -8,8 +8,9 @@
 #include <SimpleKalmanFilter.h>
 #define RPM_TIMEOUT 100
 #define BOARD_ID 0x4CF
-#define SEND_DELAY 500
+#define SEND_DELAY 100
 Metro canSend = Metro(SEND_DELAY); //set freq here
+Metro tireTemptimer = Metro(1000);
 // Can chip defines
 #define CAN_CS 10
 #define CAN_IRQ 14 //interrupt not used here, nor on board
@@ -79,12 +80,12 @@ void setup()
   }
 
   // Init CAN system
-  can.init(CAN_250KBPS); //NOTE: can will init at half the speed defined
+  can.init(CAN_500KBPS); //NOTE: can will init at half the speed defined
   // because lib is for 16mhz crystal and can breakout boards come in w/8mhz
    Serial.println("Adafruit MLX90640 Simple Test");
   if (! mlx.begin(MLX90640_I2CADDR_DEFAULT, &Wire)) {
     Serial.println("MLX90640 not found!");
-    while (1) delay(10);
+    //while (1) delay(10);
   }
   Serial.println("Found Adafruit MLX90640");
   Serial.print("Serial number: ");
@@ -158,9 +159,11 @@ void loop()
     }
   }
   //acquire le sauce
+  if(tireTemptimer.check()){
    if (mlx.getFrame(frame)) { //get IR sensor array
     Serial.println("Failed");
     return; //TODO find out how long this shit takes because it is prob blocking
+  }
   }
   int tiretemp1=0,tiretemp2=0,tiretemp3=0;
   //get first tiretemp
