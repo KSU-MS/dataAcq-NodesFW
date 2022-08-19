@@ -58,7 +58,7 @@ int tt3list[42]={ 207,208,209,210,211,212,213,
 
 void setup()
 {
-  pinMode(LED_BUILTIN,OUTPUT);
+//  pinMode(LED_BUILTIN,OUTPUT);
   delay(10);
   freq1.begin(23);
   ads.setGain(GAIN_TWOTHIRDS);
@@ -80,7 +80,7 @@ void setup()
   }
 
   // Init CAN system
-  can.init(CAN_500KBPS); //NOTE: can will init at half the speed defined
+  can.init(CAN_1000KBPS); //NOTE: can will init at half the speed defined
   // because lib is for 16mhz crystal and can breakout boards come in w/8mhz
    Serial.println("Adafruit MLX90640 Simple Test");
   if (! mlx.begin(MLX90640_I2CADDR_DEFAULT, &Wire)) {
@@ -128,7 +128,7 @@ void setup()
 }
 void loop()
 {
-  digitalWrite(LED_BUILTIN,LOW);
+  // digitalWrite(LED_BUILTIN,LOW);
   //adc0 = ads.readADC_SingleEnded(0); //grab raw adc reading as 16 bit uint
   adc0 = analogRead(A0); //trying to get an ads1113 reading will lock up teensy if it fails
   uint16_t estimated_adc0 = simpleKalmanFilter.updateEstimate(adc0);
@@ -190,8 +190,8 @@ void loop()
   // // This is how you create a packet                         //0           1             2             3   4    5    6   7
 
   if(canSend.check()){
-    digitalWrite(LED_BUILTIN,HIGH);
-    CanPacket packet = {timestamp : 0, id : BOARD_ID, data : {tiretemp1avg,tiretemp2avg, tiretemp3avg, 0x4, 0x5, 0x6, 0x7, 0x8}, delim : 0};
+    // digitalWrite(LED_BUILTIN,HIGH);
+    CanPacket packet = {timestamp : 0, id : 1, data : {tiretemp1avg,tiretemp2avg, tiretemp3avg, 0x4, 0x5, 0x6, 0x7, 0x8}, delim : 0};
     memcpy(&packet.data[3], &current_rpm, sizeof(current_rpm)); //byte 3,4 for wheel speed
     memcpy(&packet.data[5], &adc0, sizeof(estimated_adc0)); //byte 6,7 for shock pot
     can.send(&packet);
