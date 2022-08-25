@@ -192,7 +192,7 @@ void loop()
 
   if(canSend.check()){
     // digitalWrite(LED_BUILTIN,HIGH);
-    CanPacket packet = {timestamp : 0, id : 1, data : {tiretemp1avg,tiretemp2avg, tiretemp3avg, 0x4, 0x5, 0x6, 0x7, 0x8}, delim : 0};
+    CanPacket packet = {timestamp : 0, id : 0x68, data : {tiretemp1avg,tiretemp2avg, tiretemp3avg, 0x4, 0x5, 0x6, 0x7, 0x8}, delim : 0};
     memcpy(&packet.data[3], &current_rpm, sizeof(current_rpm)); //byte 3,4 for wheel speed
     memcpy(&packet.data[5], &adc0, sizeof(estimated_adc0)); //byte 6,7 for shock pot
     can.send(&packet);

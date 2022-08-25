@@ -7,6 +7,7 @@
 #include <Adafruit_L3GD20_U.h>
 #include <Adafruit_10DOF.h>
 #include <Metro.h>
+#include <KS2eCAN.hpp>
 
 /* Assign a unique ID to the sensors */
 Adafruit_10DOF                dof   = Adafruit_10DOF();
@@ -24,7 +25,7 @@ Metro getSensorData = Metro(10);
 #define CAN_CS 10
 #define CAN_IRQ 14
 float packet_timestamp;
-uint16_t packet_id=0x69;
+uint16_t packet_id=ID_BHNODE_MSG;
 uint16_t packet1_id=packet_id+1;
 byte blank_packet[8]={0xFF};
 CanNetwork can = CanNetwork(CAN_CS);
