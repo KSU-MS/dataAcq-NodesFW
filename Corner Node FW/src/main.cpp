@@ -34,7 +34,8 @@ SimpleKalmanFilter simpleKalmanFilter(2, 2, 0.01); //filter def
 // uncomment *one* of the below
 #define PRINT_TEMPERATURES
 //#define PRINT_ASCIIART
-
+//TT Lists are based off the excel plot of all the array points 
+//THese are to make it easy to average the points in an area of the tire
 int tt1list[42]={ 200,201,202,203,204,205,206,
                   232,233,234,235,236,237,238,
                   264,265,266,267,268,269,270,
@@ -80,7 +81,7 @@ void setup()
   }
 
   // Init CAN system
-  can.init(CAN_1000KBPS); //NOTE: can will init at half the speed defined
+  can.init(CAN_250KBPS); //NOTE: can will init at half the speed defined
   // because lib is for 16mhz crystal and can breakout boards come in w/8mhz
    Serial.println("Adafruit MLX90640 Simple Test");
   if (! mlx.begin(MLX90640_I2CADDR_DEFAULT, &Wire)) {
