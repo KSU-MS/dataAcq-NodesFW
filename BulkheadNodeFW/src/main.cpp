@@ -20,6 +20,9 @@ Adafruit_BMP085_Unified       bmp   = Adafruit_BMP085_Unified(18001);
   sensors_event_t bmp_event;
   sensors_vec_t   orientation;
 //
+  int32_t scaledRoll = 0;
+  int32_t scaledPitch = 0;
+  int32_t scaledHeading = 0; 
 Metro getSensorData = Metro(10);
 // Can chip
 #define CAN_CS 10
@@ -32,8 +35,8 @@ CanNetwork can = CanNetwork(CAN_CS);
 CanPacket packet = {timestamp : packet_timestamp, id : packet_id, data : {0xFF}, delim : CAN_PACKET_DELIM};
 CanPacket packet1 = {timestamp : packet_timestamp, id : packet1_id, data : {0xFF}, delim : CAN_PACKET_DELIM};
 Metro canSend = Metro(100);
-#define debug_mode true
-
+#define debug_mode false
+Metro debugtim = Metro(1000);
 void initSensors()
 {
   if(!accel.begin())
@@ -89,34 +92,31 @@ void loop()
   /* Calculate pitch and roll from the raw accelerometer data */
   if(getSensorData.check()){
     accel.getEvent(&accel_event);
-    if (dof.accelGetOrientation(&accel_event, &orientation))
-    {
-      /* 'orientation' should have valid .roll and .pitch fields */
-      Serial.print(F("Roll: "));
-      Serial.println(orientation.roll);
-      packet.data[0]= orientation.roll;
-      Serial.print(F("Pitch: "));
-      Serial.println(orientation.pitch);
-      packet.data[1] = orientation.pitch;
-      Serial.println(packet.data[1]);
-
-    }
-    /* Calculate the heading using the magnetometer */
+    dof.accelGetOrientation(&accel_event, &orientation);
     mag.getEvent(&mag_event);
-    if (dof.magGetOrientation(SENSOR_AXIS_Z, &mag_event, &orientation))
-    {
-      /* 'orientation' should have valid .heading data now */
+    dof.magGetOrientation(SENSOR_AXIS_Z, &mag_event, &orientation);
+    scaledHeading=(orientation.heading*100);
+    scaledPitch=(orientation.pitch*100);
+    scaledRoll=(orientation.roll*100);  }
+  if(debugtim.check()){
+      Serial.print(F("Roll: "));
+      Serial.println(orientation.roll,10);
       Serial.print(F("Heading: "));
-      Serial.println(orientation.heading);
-      packet.data[2] = orientation.heading;
-      Serial.println(packet.data[2]);
-    }
+      Serial.println(orientation.heading,10);
+      Serial.print(F("Pitch: "));
+      Serial.println(orientation.pitch,10);
+      Serial.print(F("ScaledRoll: "));
+      Serial.println(scaledRoll,10);
+      Serial.print(F("ScaledHeading: "));
+      Serial.println(scaledHeading,10);
+      Serial.print(F("ScaledPitch: "));
+      Serial.println(scaledPitch,10);
   }
     
   if(canSend.check()){
-    memcpy(&packet.data[0],&orientation.roll,sizeof(orientation.roll));
-    memcpy(&packet.data[4],&orientation.heading,sizeof(orientation.heading));
-    memcpy(&packet1.data[0],&orientation.pitch,sizeof(orientation.pitch));
+    memcpy(&packet.data[0],&scaledRoll,sizeof(scaledRoll));
+    memcpy(&packet.data[4],&scaledHeading,sizeof(scaledHeading));
+    memcpy(&packet1.data[0],&scaledPitch,sizeof(scaledPitch));
     can.send(&packet);
     can.send(&packet1);
   }
