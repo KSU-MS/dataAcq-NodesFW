@@ -8,6 +8,19 @@
 #include <Adafruit_10DOF.h>
 #include <Metro.h>
 #include <KS2eCAN.hpp>
+#include <Adafruit_LIS3DH.h>
+#include <SimpleKalmanFilter.h>
+SimpleKalmanFilter accelXKalman(1,1,0.01); //accelerometer X
+SimpleKalmanFilter accelYKalman(1,1,0.01); //accelerometer Y
+SimpleKalmanFilter accelZKalman(1,1,0.01); //accelerometer Z
+//
+SimpleKalmanFilter gyrorollKalman(1,1,0.01); //gyro roll
+SimpleKalmanFilter gyropitchKalman(1,1,0.01); //gyro pitch
+SimpleKalmanFilter gyroheadingKalman(1,1,0.01); //gyro heading
+//
+SimpleKalmanFilter brakepress1kalman(1,1,0.01); //gyro roll
+SimpleKalmanFilter brakepress2kalman(1,1,0.01); //gyro pitch
+SimpleKalmanFilter steeringkalman(1,1,0.01); //gyro heading
 
 /* Assign a unique ID to the sensors */
 Adafruit_10DOF                dof   = Adafruit_10DOF();
@@ -23,20 +36,32 @@ Adafruit_BMP085_Unified       bmp   = Adafruit_BMP085_Unified(18001);
   int32_t scaledRoll = 0;
   int32_t scaledPitch = 0;
   int32_t scaledHeading = 0; 
+//
+Adafruit_LIS3DH lis = Adafruit_LIS3DH();
+//
+sensors_event_t lis3event;
+int16_t accelX=0;
+int16_t accelY=0;
+int16_t accelZ=0;
+//
+uint16_t brakePress1=0;
+uint16_t brakePress2=0;
+uint16_t steering=0;
 Metro getSensorData = Metro(10);
 // Can chip
 #define CAN_CS 10
 #define CAN_IRQ 14
-float packet_timestamp;
+uint32_t packet_timestamp;
 uint16_t packet_id=ID_BHNODE_MSG;
 uint16_t packet1_id=packet_id+1;
-byte blank_packet[8]={0xFF};
 CanNetwork can = CanNetwork(CAN_CS);
 CanPacket packet = {timestamp : packet_timestamp, id : packet_id, data : {0xFF}, delim : CAN_PACKET_DELIM};
 CanPacket packet1 = {timestamp : packet_timestamp, id : packet1_id, data : {0xFF}, delim : CAN_PACKET_DELIM};
 Metro canSend = Metro(100);
+//
 #define debug_mode false
 Metro debugtim = Metro(1000);
+unsigned long getSensorDataEndTime;
 void initSensors()
 {
   if(!accel.begin())
@@ -57,11 +82,39 @@ void initSensors()
     Serial.println("Ooops, no BMP180 detected ... Check your wiring!");
     while(1);
   }
+Serial.println("LIS3DH test!");
+
+  if (! lis.begin(0x19)) {   // change this to 0x19 for alternative i2c address
+    Serial.println("Couldnt start");
+    while (1) yield();
+  }
+  Serial.println("LIS3DH found!");
+
+  lis.setRange(LIS3DH_RANGE_2_G);   // 2, 4, 8 or 16 G!
+
+  Serial.print("Range = "); Serial.print(2 << lis.getRange());
+  Serial.println("G");
+
+  //lis.setDataRate(LIS3DH_DATARATE_50_HZ);
+  Serial.print("Data rate set to: ");
+  switch (lis.getDataRate()) {
+    case LIS3DH_DATARATE_1_HZ: Serial.println("1 Hz"); break;
+    case LIS3DH_DATARATE_10_HZ: Serial.println("10 Hz"); break;
+    case LIS3DH_DATARATE_25_HZ: Serial.println("25 Hz"); break;
+    case LIS3DH_DATARATE_50_HZ: Serial.println("50 Hz"); break;
+    case LIS3DH_DATARATE_100_HZ: Serial.println("100 Hz"); break;
+    case LIS3DH_DATARATE_200_HZ: Serial.println("200 Hz"); break;
+    case LIS3DH_DATARATE_400_HZ: Serial.println("400 Hz"); break;
+
+    case LIS3DH_DATARATE_POWERDOWN: Serial.println("Powered Down"); break;
+    case LIS3DH_DATARATE_LOWPOWER_5KHZ: Serial.println("5 Khz Low Power"); break;
+    case LIS3DH_DATARATE_LOWPOWER_1K6HZ: Serial.println("16 Khz Low Power"); break;
+  }
 }
 
 void setup()
 {
-
+  delay(5000);
   if (debug_mode)
   {
     Serial.begin(115200);
@@ -82,36 +135,57 @@ void setup()
   can.init(CAN_250KBPS);
 
 }
-unsigned long last = 0;
-unsigned long lastP = 0;
 void loop()
 {
-
-  // CanPacket packet = {timestamp : millis(), id : 100, data : {0x1,0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8}, delim : CAN_PACKET_DELIM};
-
   /* Calculate pitch and roll from the raw accelerometer data */
   if(getSensorData.check()){
+    unsigned long getSensorDataStartTime=millis(); //time how long getting sensor info takes
+    //get 10 dof shit here
     accel.getEvent(&accel_event);
     dof.accelGetOrientation(&accel_event, &orientation);
     mag.getEvent(&mag_event);
     dof.magGetOrientation(SENSOR_AXIS_Z, &mag_event, &orientation);
-    scaledHeading=(orientation.heading*100);
-    scaledPitch=(orientation.pitch*100);
-    scaledRoll=(orientation.roll*100);  }
-  if(debugtim.check()){
-      Serial.print(F("Roll: "));
-      Serial.println(orientation.roll,10);
-      Serial.print(F("Heading: "));
-      Serial.println(orientation.heading,10);
-      Serial.print(F("Pitch: "));
-      Serial.println(orientation.pitch,10);
-      Serial.print(F("ScaledRoll: "));
-      Serial.println(scaledRoll,10);
-      Serial.print(F("ScaledHeading: "));
-      Serial.println(scaledHeading,10);
-      Serial.print(F("ScaledPitch: "));
-      Serial.println(scaledPitch,10);
+    lis.read();
+    lis.getEvent(&lis3event);
+        accelX=lis3event.acceleration.x*100;
+      int16_t estimated_accelx=accelXKalman.updateEstimate(accelX);
+        accelY=lis3event.acceleration.y*100;
+      int16_t estimated_accely=accelYKalman.updateEstimate(accelY);
+        accelZ=lis3event.acceleration.z*100;
+      int16_t estimated_accelz=accelZKalman.updateEstimate(accelZ);
+    lis.readADC(1);
+    lis.readADC(2);
+    lis.readADC(3);
+    scaledHeading=(orientation.heading*10);
+    scaledPitch=(orientation.pitch*10);
+    scaledRoll=(orientation.roll*10);
+    getSensorDataEndTime = millis() - getSensorDataStartTime; //see how long it took
+    Serial.printf("%d,%d,%d,%d,%d,%d\n",accelX,estimated_accelx,accelY,estimated_accely,accelZ,estimated_accelz);
   }
+  // if(debugtim.check()){
+  //     Serial.print(F("Roll: "));
+  //     Serial.println(orientation.roll,10);
+  //     Serial.print(F("Heading: "));
+  //     Serial.println(orientation.heading,10);
+  //     Serial.print(F("Pitch: "));
+  //     Serial.println(orientation.pitch,10);
+  //     Serial.print(F("ScaledRoll: "));
+  //     Serial.println(scaledRoll,10);
+  //     Serial.print(F("ScaledHeading: "));
+  //     Serial.println(scaledHeading,10);
+  //     Serial.print(F("ScaledPitch: "));
+  //     Serial.println(scaledPitch,10);
+  //     Serial.print(F("Sensor data get time: "));
+  //     Serial.println(getSensorDataEndTime);
+  //       /* Display the results (acceleration is measured in m/s^2) */
+  //     Serial.print("\tX: "); Serial.print(lis3event.acceleration.x);
+  //     Serial.print(" \tY: "); Serial.print(lis3event.acceleration.y);
+  //     Serial.print(" \tZ: "); Serial.print(lis3event.acceleration.z);
+  //     Serial.println(" m/s^2 ");
+  //     Serial.print("\tX:  "); Serial.print(lis.x);
+  //     Serial.print("  \tY:  "); Serial.print(lis.y);
+  //     Serial.print("  \tZ:  "); Serial.println(lis.z);
+  // }
     
   if(canSend.check()){
     memcpy(&packet.data[0],&scaledRoll,sizeof(scaledRoll));
