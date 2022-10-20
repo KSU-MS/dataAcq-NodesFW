@@ -10,13 +10,14 @@
 #include <KS2eCAN.hpp>
 #include <Adafruit_LIS3DH.h>
 #include <SimpleKalmanFilter.h>
+#define GYRO_Q 0.01
 SimpleKalmanFilter accelXKalman(1,1,0.01); //accelerometer X
 SimpleKalmanFilter accelYKalman(1,1,0.01); //accelerometer Y
 SimpleKalmanFilter accelZKalman(1,1,0.01); //accelerometer Z
 //
-SimpleKalmanFilter gyrorollKalman(1,1,0.01); //gyro roll
-SimpleKalmanFilter gyropitchKalman(1,1,0.01); //gyro pitch
-SimpleKalmanFilter gyroheadingKalman(1,1,0.01); //gyro heading
+SimpleKalmanFilter gyrorollKalman(1,1,GYRO_Q); //gyro roll
+SimpleKalmanFilter gyropitchKalman(1,1,GYRO_Q); //gyro pitch
+SimpleKalmanFilter gyroheadingKalman(1,1,GYRO_Q); //gyro heading
 //
 SimpleKalmanFilter brakepress1kalman(1,1,0.01); //gyro roll
 SimpleKalmanFilter brakepress2kalman(1,1,0.01); //gyro pitch
@@ -157,11 +158,24 @@ void loop()
     lis.readADC(2);
     lis.readADC(3);
     scaledHeading=(orientation.heading*10);
+      int16_t estimated_heading = gyroheadingKalman.updateEstimate(scaledHeading);
     scaledPitch=(orientation.pitch*10);
+      int16_t estimated_pitch = gyropitchKalman.updateEstimate(scaledPitch);
     scaledRoll=(orientation.roll*10);
+      int16_t estimated_roll = gyrorollKalman.updateEstimate(scaledRoll);
+
+
     getSensorDataEndTime = millis() - getSensorDataStartTime; //see how long it took
-    Serial.printf("%d,%d,%d,%d,%d,%d\n",accelX,estimated_accelx,accelY,estimated_accely,accelZ,estimated_accelz);
+    //Serial.printf("%d,%d,%d,%d,%d,%d\n",accelX,estimated_accelx,accelY,estimated_accely,accelZ,estimated_accelz);
+    Serial.printf("%d,%d,%d,%d,%d,%d\n",scaledHeading,scaledPitch,scaledRoll,estimated_heading,estimated_pitch,estimated_roll);\
+    analogWrite(3,map(estimated_heading,0,3600,0,255));
+    analogWrite(4,map(estimated_pitch,-1800,1800,0,255));
+    analogWrite(6,map(estimated_roll,-1800,1800,0,255));
   }
+  //pin 3 = heading, 4 = pitch, 6=roll
+
+  
+
   // if(debugtim.check()){
   //     Serial.print(F("Roll: "));
   //     Serial.println(orientation.roll,10);
